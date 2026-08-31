@@ -10,6 +10,7 @@
 - Added provider-supplied model metadata to the `/models` detail line: `new`, `beta`, and `recommended` badges beside the model name, and the upstream description after the context, cost, and perf facts ([#8590](https://github.com/can1357/oh-my-pi/pull/8590) by [@will-bogusz](https://github.com/will-bogusz)).
 - Standalone `CLAUDE.md` files in the project root (and ancestor directories) are now loaded as context, mirroring `AGENTS.md` discovery; config-directory context files still take precedence per scope.
 - Added an opt-in `todo` status-line segment showing closed/total todo counts (configure via `statusLine.leftSegments`/`statusLine.rightSegments`).
+- The `git` status-line segment now shows upstream divergence (`↑N` unpushed, `↓N` behind); disable with `statusLine.segmentOptions.git.showUpstream: false`.
 
 ### Changed
 

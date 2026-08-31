@@ -22,7 +22,13 @@ export interface CollabStatus {
 export interface StatusLineSegmentOptions {
 	model?: { showThinkingLevel?: boolean };
 	path?: { abbreviate?: boolean; maxLength?: number; stripWorkPrefix?: boolean };
-	git?: { showBranch?: boolean; showStaged?: boolean; showUnstaged?: boolean; showUntracked?: boolean };
+	git?: {
+		showBranch?: boolean;
+		showStaged?: boolean;
+		showUnstaged?: boolean;
+		showUntracked?: boolean;
+		showUpstream?: boolean;
+	};
 	time?: { format?: "12h" | "24h"; showSeconds?: boolean };
 }
 
@@ -151,6 +157,14 @@ export interface SegmentContext {
 		branch: string | null;
 		status: { staged: number; unstaged: number; untracked: number } | null;
 		pr: { number: number; url: string } | null;
+		/**
+		 * Commits the local branch has that its configured upstream does not
+		 * (`ahead`) and vice versa (`behind`). Null when there is no upstream,
+		 * the repo is jj, git is disabled, or the first async resolve has not
+		 * landed yet. Never triggers a fetch: `behind` only moves after the
+		 * user fetches by other means.
+		 */
+		upstream?: { ahead: number; behind: number } | null;
 	};
 	/**
 	 * Set when the path cwd is a *linked* git worktree, naming the shared

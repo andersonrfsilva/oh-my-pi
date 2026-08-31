@@ -73,6 +73,7 @@ function baseContext(sessionOptions?: GallerySessionOptions): SegmentContext {
 			branch: "gallery/reference",
 			status: { staged: 2, unstaged: 3, untracked: 1 },
 			pr: { number: 1842, url: "https://github.com/can1357/oh-my-pi/pull/1842" },
+			upstream: null,
 		},
 		worktree: null,
 		usage: {
@@ -161,7 +162,31 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 			return [
 				{
 					label: "clean",
-					context: { git: { branch: "main", status: { staged: 0, unstaged: 0, untracked: 0 }, pr: null } },
+					context: {
+						git: { branch: "main", status: { staged: 0, unstaged: 0, untracked: 0 }, pr: null, upstream: null },
+					},
+				},
+				{
+					label: "ahead of upstream",
+					context: {
+						git: {
+							branch: "main",
+							status: { staged: 0, unstaged: 0, untracked: 0 },
+							pr: null,
+							upstream: { ahead: 3, behind: 0 },
+						},
+					},
+				},
+				{
+					label: "diverged",
+					context: {
+						git: {
+							branch: "main",
+							status: { staged: 0, unstaged: 0, untracked: 0 },
+							pr: null,
+							upstream: { ahead: 3, behind: 2 },
+						},
+					},
 				},
 				{ label: "dirty" },
 			];

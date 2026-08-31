@@ -46,6 +46,12 @@ import type {
 } from "./types";
 
 const JJ_REFRESH_TTL_MS = 5000;
+/**
+ * Ahead/behind only moves on commit/push/fetch, and HEAD moves already drop the
+ * cache via {@link StatusLineComponent.invalidateGitCaches}, so a short TTL
+ * would just burn ref walks.
+ */
+const UPSTREAM_REFRESH_TTL_MS = 10_000;
 const JJ_COMMAND_TIMEOUT_MS = 5_000;
 const WATCHER_FAILURE_POLL_TTL_MS = 5000;
 /** Brand-color fade duration across working-state edges (rust omp's `BRAND_FADE`). */
@@ -445,6 +451,12 @@ export class StatusLineComponent implements Component {
 	#cachedGitStatusCwd: string | undefined = undefined;
 	#gitStatusLastFetch = 0;
 	#gitStatusInFlightCwd: string | undefined = undefined;
+
+	// Upstream ahead/behind caching (UPSTREAM_REFRESH_TTL_MS)
+	#cachedUpstream: { ahead: number; behind: number } | null = null;
+	#cachedUpstreamCwd: string | undefined = undefined;
+	#upstreamLastFetch = 0;
+	#upstreamInFlightCwd: string | undefined = undefined;
 	#cachedJjBranch: string | null = null;
 	#jjBranchLastFetch = 0;
 	#jjResolveSeq = 0;
@@ -931,6 +943,12 @@ export class StatusLineComponent implements Component {
 		this.#branchLastFetch = undefined;
 		this.#branchCacheGeneration++;
 		this.#cachedPrContext = undefined;
+		// A HEAD move (commit, checkout, a push that fast-forwards the local ref)
+		// changes ahead/behind, so drop the upstream cache too. The in-flight cwd
+		// is left alone: that guard clears itself when the resolve settles.
+		this.#cachedUpstream = null;
+		this.#cachedUpstreamCwd = undefined;
+		this.#upstreamLastFetch = 0;
 		// jj label/status share the git segment's lifecycle: a HEAD move (e.g. a
 		// colocated `jj new`/bookmark move) must drop the throttled jj caches too,
 		// so the next render refetches.
@@ -1171,6 +1189,76 @@ export class StatusLineComponent implements Component {
 		})();
 
 		return this.#cachedGitStatusCwd === gitCwd ? this.#cachedGitStatus : null;
+	}
+
+	/**
+	 * Commits the current branch has that its configured upstream does not, and
+	 * vice versa. Resolved off the render path behind a single-flight,
+	 * cwd-keyed, TTL'd cache exactly like {@link #getStatus}; the first render
+	 * after a cache miss returns null and a repaint follows when the value
+	 * actually changes. Never fetches, so `behind` only moves once the user
+	 * fetches by other means.
+	 */
+	#getUpstream(effectiveGitCwd?: string): { ahead: number; behind: number } | null {
+		if (!this.#gitEnabled()) return null;
+
+		const gitCwd = effectiveGitCwd ?? this.#resolveActiveRepoCache().effectiveGitCwd;
+		const repository = vcs.repo(gitCwd);
+		if (!repository) return null;
+		// jj has no upstream-tracking concept on this surface.
+		if (repository.kind() !== "git") return null;
+
+		if (this.#upstreamInFlightCwd !== undefined) {
+			return this.#cachedUpstreamCwd === gitCwd ? this.#cachedUpstream : null;
+		}
+		if (this.#cachedUpstreamCwd === gitCwd && Date.now() - this.#upstreamLastFetch < UPSTREAM_REFRESH_TTL_MS) {
+			return this.#cachedUpstream;
+		}
+
+		this.#upstreamInFlightCwd = gitCwd;
+
+		(async () => {
+			let nextUpstream: { ahead: number; behind: number } | null = null;
+			try {
+				const repo = vcs.git(gitCwd);
+				const branch = await repo?.currentBranch();
+				if (repo && branch) {
+					const [remote, mergeRef] = await Promise.all([
+						repo.configGet(`branch.${branch}.remote`),
+						repo.configGet(`branch.${branch}.merge`),
+					]);
+					if (remote && mergeRef) {
+						const shortRef = mergeRef.replace(/^refs\/heads\//, "");
+						// `.` is git's marker for a branch tracking another local branch.
+						const upstreamRef = remote === "." ? shortRef : `refs/remotes/${remote}/${shortRef}`;
+						if (await repo.refExists(upstreamRef)) {
+							const [aheadCommits, behindCommits] = await Promise.all([
+								repo.revListRange(upstreamRef, "HEAD"),
+								repo.revListRange("HEAD", upstreamRef),
+							]);
+							nextUpstream = { ahead: aheadCommits.length, behind: behindCommits.length };
+						}
+					}
+				}
+			} catch {
+				// Detached HEAD, a pruned remote ref, a locked index: degrade to
+				// "no info" rather than throwing on a render.
+				nextUpstream = null;
+			} finally {
+				if (this.#upstreamInFlightCwd === gitCwd) {
+					const prev = this.#cachedUpstreamCwd === gitCwd ? this.#cachedUpstream : null;
+					this.#cachedUpstream = nextUpstream;
+					this.#cachedUpstreamCwd = gitCwd;
+					this.#upstreamLastFetch = Date.now();
+					this.#upstreamInFlightCwd = undefined;
+					if (!this.#disposed && this.#onBranchChange && JSON.stringify(prev) !== JSON.stringify(nextUpstream)) {
+						this.#onBranchChange();
+					}
+				}
+			}
+		})();
+
+		return this.#cachedUpstreamCwd === gitCwd ? this.#cachedUpstream : null;
 	}
 
 	#lookupPr(effectiveGitCwd?: string): { number: number; url: string } | null {
@@ -1820,6 +1908,7 @@ export class StatusLineComponent implements Component {
 			: { projectDir, activeRepo: null, effectiveGitCwd: projectDir, worktree: null };
 		const gitBranch = includeGit || includePr ? this.#getBranchLabel(activeRepoCache.effectiveGitCwd) : null;
 		const gitStatus = includeGit ? this.#getStatus(activeRepoCache.effectiveGitCwd) : null;
+		const gitUpstream = includeGit ? this.#getUpstream(activeRepoCache.effectiveGitCwd) : null;
 		const gitPr = includePr ? this.#lookupPr(activeRepoCache.effectiveGitCwd) : null;
 		const compactionSpeculation = this.session.compactionSpeculation ?? "idle";
 		this.#syncSpeculationBlink(compactionSpeculation);
@@ -1859,6 +1948,7 @@ export class StatusLineComponent implements Component {
 				branch: gitBranch,
 				status: gitStatus,
 				pr: gitPr,
+				upstream: gitUpstream,
 			},
 			worktree: activeRepoCache.worktree,
 			usage: this.#cachedUsage,

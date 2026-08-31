@@ -420,6 +420,16 @@ const gitSegment: StatusLineSegment = {
 			}
 		}
 
+		// Unpushed/unpulled commits are not working-tree dirt: these ride
+		// alongside the dirty counters but must never flip `isDirty`.
+		const upstream = ctx.git.upstream;
+		if (opts.showUpstream !== false && upstream && (upstream.ahead > 0 || upstream.behind > 0)) {
+			const parts: string[] = [];
+			if (upstream.ahead > 0) parts.push(theme.fg("statusLineStaged", `↑${upstream.ahead}`));
+			if (upstream.behind > 0) parts.push(theme.fg("statusLineDirty", `↓${upstream.behind}`));
+			content += content ? ` ${parts.join(" ")}` : parts.join(" ");
+		}
+
 		if (!content) return { content: "", visible: false };
 
 		const colorName = isDirty ? "statusLineGitDirty" : "statusLineGitClean";
