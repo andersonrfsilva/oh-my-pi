@@ -19,6 +19,7 @@ import { settings } from "../../../config/settings";
 import type { AgentSession } from "../../../session/agent-session";
 import type { OAuthAccountIdentity } from "../../../session/auth-storage";
 import { limitMatchesActiveAccount } from "../../../slash-commands/helpers/active-oauth-account";
+import { isClosedTodo } from "../../../tools/todo";
 import { type ActiveRepoContext, resolveActiveRepoContextSync } from "../../../utils/active-repo-context";
 import { withTimeoutSignal } from "../../../utils/fetch-timeout";
 import { GH_COMMAND_TIMEOUT_MS, github } from "../../../utils/github";
@@ -1746,12 +1747,33 @@ export class StatusLineComponent implements Component {
 		return { usedTokens, contextWindow };
 	}
 
+	/**
+	 * Todo counters for the `todo` segment. `getTodoPhases()` returns a
+	 * defensive clone, so this runs once per render (never once per segment)
+	 * and only when the configured layout actually shows the segment.
+	 */
+	#todoCounts(): { closed: number; total: number; blocked: number } | null {
+		const phases = this.session.getTodoPhases?.() ?? [];
+		let total = 0;
+		let closed = 0;
+		let blocked = 0;
+		for (const phase of phases) {
+			for (const task of phase.tasks) {
+				total++;
+				if (isClosedTodo(task)) closed++;
+				else if (task.status === "blocked") blocked++;
+			}
+		}
+		return total === 0 ? null : { closed, total, blocked };
+	}
+
 	#buildSegmentContext(
 		width: number,
 		segmentOptions: StatusLineSettings["segmentOptions"],
 		includePath: boolean,
 		includeGit: boolean,
 		includePr: boolean,
+		includeTodo: boolean,
 		previewTitle?: string,
 	): SegmentContext {
 		const state = this.session.state;
@@ -1829,6 +1851,7 @@ export class StatusLineComponent implements Component {
 			compactionSpeculation,
 			speculationBlinkOn: this.#speculationBlinkOn,
 			subagentCount: this.#subagentCount,
+			todo: includeTodo ? this.#todoCounts() : null,
 			activeMs: this.getActiveMs(),
 			turnElapsedMs,
 			brandFgAnsi: this.#brandFgAnsi(turnElapsedMs !== null, sessionAccentEnabled),
@@ -1919,12 +1942,15 @@ export class StatusLineComponent implements Component {
 			(hasGitSegment(effectiveSettings.leftSegments) || hasGitSegment(effectiveSettings.rightSegments));
 		const includePr =
 			gitEnabled && (hasPrSegment(effectiveSettings.leftSegments) || hasPrSegment(effectiveSettings.rightSegments));
+		const includeTodo =
+			effectiveSettings.leftSegments.includes("todo") || effectiveSettings.rightSegments.includes("todo");
 		const ctx = this.#buildSegmentContext(
 			width,
 			effectiveSettings.segmentOptions,
 			includePath,
 			includeGit,
 			includePr,
+			includeTodo,
 			previewTitle,
 		);
 		const separatorDef = plain

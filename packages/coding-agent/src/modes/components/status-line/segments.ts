@@ -450,6 +450,18 @@ const subagentsSegment: StatusLineSegment = {
 	},
 };
 
+const todoSegment: StatusLineSegment = {
+	id: "todo",
+	render(ctx) {
+		const todo = ctx.todo;
+		if (!todo) return { content: "", visible: false };
+		const color: ThemeColor =
+			todo.blocked > 0 ? "warning" : todo.closed === todo.total ? "success" : "statusLineContext";
+		const text = withIcon(theme.checkbox.checked, `${todo.closed}/${todo.total}`);
+		return { content: theme.fg(color, text), visible: true };
+	},
+};
+
 const tokenInSegment: StatusLineSegment = {
 	id: "token_in",
 	render(ctx) {
@@ -797,6 +809,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	git: gitSegment,
 	pr: prSegment,
 	subagents: subagentsSegment,
+	todo: todoSegment,
 	token_in: tokenInSegment,
 	token_out: tokenOutSegment,
 	token_total: tokenTotalSegment,

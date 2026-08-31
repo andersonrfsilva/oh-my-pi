@@ -118,6 +118,15 @@ export interface SegmentContext {
 	speculationBlinkOn: boolean;
 	subagentCount: number;
 	/**
+	 * Todo counters for the `todo` segment; null when the configured layout has
+	 * no todo segment (the component then skips the snapshot entirely) or the
+	 * list is empty. `closed` uses the shared `isClosedTodo` policy (completed +
+	 * abandoned); `blocked` only colors the segment, it is never added to
+	 * `closed`. Absent in direct-segment fixtures that predate the segment,
+	 * which render as hidden.
+	 */
+	todo?: { closed: number; total: number; blocked: number } | null;
+	/**
 	 * Active processing time accumulated this session, in ms — the union of
 	 * every `agent_start`→`agent_end` window plus the currently-streaming
 	 * window if the agent is running. Idle wall-clock never contributes, so

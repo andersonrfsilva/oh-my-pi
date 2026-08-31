@@ -66,6 +66,7 @@ function baseContext(sessionOptions?: GallerySessionOptions): SegmentContext {
 		compactionSpeculation: "idle",
 		speculationBlinkOn: false,
 		subagentCount: 3,
+		todo: { closed: 4, total: 7, blocked: 0 },
 		activeMs: 372_000,
 		turnElapsedMs: null,
 		git: {
@@ -231,6 +232,13 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 			return [
 				{ label: "host active", context: { collab: { role: "host", participantCount: 3 } } },
 				{ label: "guest active", context: { collab: { role: "guest", participantCount: 3 } } },
+			];
+		case "todo":
+			return [
+				{ label: "in progress", context: { todo: { closed: 4, total: 7, blocked: 0 } } },
+				{ label: "blocked", context: { todo: { closed: 4, total: 7, blocked: 1 } } },
+				{ label: "all done", context: { todo: { closed: 7, total: 7, blocked: 0 } } },
+				{ label: "no todos", context: { todo: null } },
 			];
 		default:
 			return [{ label: "canonical" }];
