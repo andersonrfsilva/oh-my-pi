@@ -52,6 +52,13 @@ const JJ_REFRESH_TTL_MS = 5000;
  * would just burn ref walks.
  */
 const UPSTREAM_REFRESH_TTL_MS = 10_000;
+/**
+ * 30 s is deliberate: worktrees are created/removed by explicit user or
+ * subagent actions, `vcs.watch` invalidation covers HEAD moves, and
+ * `worktrees()` shells out through the native layer to read repository
+ * metadata — this must not run at spinner cadence.
+ */
+const WORKTREE_REFRESH_TTL_MS = 30_000;
 const JJ_COMMAND_TIMEOUT_MS = 5_000;
 const WATCHER_FAILURE_POLL_TTL_MS = 5000;
 /** Brand-color fade duration across working-state edges (rust omp's `BRAND_FADE`). */
@@ -351,6 +358,9 @@ function hasGitSegment(segments: readonly StatusLineSegmentId[]): boolean {
 function hasPrSegment(segments: readonly StatusLineSegmentId[]): boolean {
 	return segments.includes("pr");
 }
+function hasWorktreesSegment(segments: readonly StatusLineSegmentId[]): boolean {
+	return segments.includes("worktrees");
+}
 function hasPathSegment(segments: readonly StatusLineSegmentId[]): boolean {
 	return segments.includes("path");
 }
@@ -457,6 +467,12 @@ export class StatusLineComponent implements Component {
 	#cachedUpstreamCwd: string | undefined = undefined;
 	#upstreamLastFetch = 0;
 	#upstreamInFlightCwd: string | undefined = undefined;
+
+	// Worktree count caching (WORKTREE_REFRESH_TTL_MS)
+	#cachedWorktreeCount: number | null = null;
+	#cachedWorktreeCountCwd: string | undefined = undefined;
+	#worktreeCountLastFetch = 0;
+	#worktreeCountInFlightCwd: string | undefined = undefined;
 	#cachedJjBranch: string | null = null;
 	#jjBranchLastFetch = 0;
 	#jjResolveSeq = 0;
@@ -949,6 +965,13 @@ export class StatusLineComponent implements Component {
 		this.#cachedUpstream = null;
 		this.#cachedUpstreamCwd = undefined;
 		this.#upstreamLastFetch = 0;
+		// A sibling worktree add/remove does not move this worktree's HEAD, so
+		// this reset only covers the HEAD-move case; the TTL is the refresh path
+		// for sibling changes. The in-flight cwd is left alone for the same
+		// reason as the upstream cache above.
+		this.#cachedWorktreeCount = null;
+		this.#cachedWorktreeCountCwd = undefined;
+		this.#worktreeCountLastFetch = 0;
 		// jj label/status share the git segment's lifecycle: a HEAD move (e.g. a
 		// colocated `jj new`/bookmark move) must drop the throttled jj caches too,
 		// so the next render refetches.
@@ -1259,6 +1282,57 @@ export class StatusLineComponent implements Component {
 		})();
 
 		return this.#cachedUpstreamCwd === gitCwd ? this.#cachedUpstream : null;
+	}
+
+	/**
+	 * Number of worktrees registered for the active repository, resolved off
+	 * the render path behind a single-flight, cwd-keyed, TTL'd cache exactly
+	 * like {@link #getUpstream}. The primary checkout counts as one, so a
+	 * plain repository resolves to 1.
+	 */
+	#getWorktreeCount(effectiveGitCwd?: string): number | null {
+		if (!this.#gitEnabled()) return null;
+
+		const gitCwd = effectiveGitCwd ?? this.#resolveActiveRepoCache().effectiveGitCwd;
+		const repository = vcs.repo(gitCwd);
+		if (!repository) return null;
+		// jj workspaces have no git worktree list here.
+		if (repository.kind() !== "git") return null;
+
+		if (this.#worktreeCountInFlightCwd !== undefined) {
+			return this.#cachedWorktreeCountCwd === gitCwd ? this.#cachedWorktreeCount : null;
+		}
+		if (
+			this.#cachedWorktreeCountCwd === gitCwd &&
+			Date.now() - this.#worktreeCountLastFetch < WORKTREE_REFRESH_TTL_MS
+		) {
+			return this.#cachedWorktreeCount;
+		}
+
+		this.#worktreeCountInFlightCwd = gitCwd;
+
+		(async () => {
+			let next: number | null = null;
+			try {
+				const entries = await vcs.git(gitCwd)?.worktrees();
+				next = entries ? entries.length : null;
+			} catch {
+				next = null;
+			} finally {
+				if (this.#worktreeCountInFlightCwd === gitCwd) {
+					const prev = this.#cachedWorktreeCountCwd === gitCwd ? this.#cachedWorktreeCount : null;
+					this.#cachedWorktreeCount = next;
+					this.#cachedWorktreeCountCwd = gitCwd;
+					this.#worktreeCountLastFetch = Date.now();
+					this.#worktreeCountInFlightCwd = undefined;
+					if (!this.#disposed && this.#onBranchChange && prev !== next) {
+						this.#onBranchChange();
+					}
+				}
+			}
+		})();
+
+		return this.#cachedWorktreeCountCwd === gitCwd ? this.#cachedWorktreeCount : null;
 	}
 
 	#lookupPr(effectiveGitCwd?: string): { number: number; url: string } | null {
@@ -1861,6 +1935,7 @@ export class StatusLineComponent implements Component {
 		includePath: boolean,
 		includeGit: boolean,
 		includePr: boolean,
+		includeWorktrees: boolean,
 		includeTodo: boolean,
 		previewTitle?: string,
 	): SegmentContext {
@@ -1901,7 +1976,8 @@ export class StatusLineComponent implements Component {
 			contextPercent = collabState.contextUsage.percent ?? contextPercent;
 		}
 
-		const shouldResolveActiveRepo = this.#gitEnabled() && (includePath || includeGit || includePr);
+		const shouldResolveActiveRepo =
+			this.#gitEnabled() && (includePath || includeGit || includePr || includeWorktrees);
 		const projectDir = getProjectDir();
 		const activeRepoCache = shouldResolveActiveRepo
 			? this.#resolveActiveRepoCache()
@@ -1909,6 +1985,7 @@ export class StatusLineComponent implements Component {
 		const gitBranch = includeGit || includePr ? this.#getBranchLabel(activeRepoCache.effectiveGitCwd) : null;
 		const gitStatus = includeGit ? this.#getStatus(activeRepoCache.effectiveGitCwd) : null;
 		const gitUpstream = includeGit ? this.#getUpstream(activeRepoCache.effectiveGitCwd) : null;
+		const worktreeCount = includeWorktrees ? this.#getWorktreeCount(activeRepoCache.effectiveGitCwd) : null;
 		const gitPr = includePr ? this.#lookupPr(activeRepoCache.effectiveGitCwd) : null;
 		const compactionSpeculation = this.session.compactionSpeculation ?? "idle";
 		this.#syncSpeculationBlink(compactionSpeculation);
@@ -1951,6 +2028,7 @@ export class StatusLineComponent implements Component {
 				upstream: gitUpstream,
 			},
 			worktree: activeRepoCache.worktree,
+			worktreeCount,
 			usage: this.#cachedUsage,
 		};
 	}
@@ -2032,6 +2110,9 @@ export class StatusLineComponent implements Component {
 			(hasGitSegment(effectiveSettings.leftSegments) || hasGitSegment(effectiveSettings.rightSegments));
 		const includePr =
 			gitEnabled && (hasPrSegment(effectiveSettings.leftSegments) || hasPrSegment(effectiveSettings.rightSegments));
+		const includeWorktrees =
+			gitEnabled &&
+			(hasWorktreesSegment(effectiveSettings.leftSegments) || hasWorktreesSegment(effectiveSettings.rightSegments));
 		const includeTodo =
 			effectiveSettings.leftSegments.includes("todo") || effectiveSettings.rightSegments.includes("todo");
 		const ctx = this.#buildSegmentContext(
@@ -2040,6 +2121,7 @@ export class StatusLineComponent implements Component {
 			includePath,
 			includeGit,
 			includePr,
+			includeWorktrees,
 			includeTodo,
 			previewTitle,
 		);

@@ -382,6 +382,17 @@ const pathSegment: StatusLineSegment = {
 	},
 };
 
+const worktreesSegment: StatusLineSegment = {
+	id: "worktrees",
+	render(ctx) {
+		const count = ctx.worktreeCount;
+		// A plain checkout lists exactly one worktree — nothing worth a slot.
+		if (count == null || count <= 1) return { content: "", visible: false };
+		const content = withIcon(theme.icon.worktree, `${count}`);
+		return { content: theme.fg("statusLinePath", content), visible: true };
+	},
+};
+
 const gitSegment: StatusLineSegment = {
 	id: "git",
 	render(ctx) {
@@ -816,6 +827,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	model: modelSegment,
 	mode: modeSegment,
 	path: pathSegment,
+	worktrees: worktreesSegment,
 	git: gitSegment,
 	pr: prSegment,
 	subagents: subagentsSegment,

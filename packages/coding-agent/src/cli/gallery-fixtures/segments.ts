@@ -76,6 +76,7 @@ function baseContext(sessionOptions?: GallerySessionOptions): SegmentContext {
 			upstream: null,
 		},
 		worktree: null,
+		worktreeCount: 4,
 		usage: {
 			tier: "Pro",
 			fiveHour: { percent: 32, resetMinutes: 71 },
@@ -157,6 +158,12 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 						git: { branch: "gallery-reference", status: null, pr: null },
 					},
 				},
+			];
+		case "worktrees":
+			return [
+				{ label: "multiple worktrees", context: { worktreeCount: 4 } },
+				{ label: "single checkout", context: { worktreeCount: 1 } },
+				{ label: "unknown", context: { worktreeCount: null } },
 			];
 		case "git":
 			return [

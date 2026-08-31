@@ -241,6 +241,7 @@ export type StatusLineSegmentId =
 	| "model"
 	| "mode"
 	| "path"
+	| "worktrees"
 	| "git"
 	| "pr"
 	| "subagents"

@@ -173,6 +173,13 @@ export interface SegmentContext {
 	 * the worktree/branch is already shown by the git segment.
 	 */
 	worktree: { projectName: string; worktreeName: string } | null;
+	/**
+	 * Number of worktrees registered for the active repository (the primary
+	 * checkout counts as one), or null when git is disabled, the repo is not
+	 * git, no `worktrees` segment is configured, or the first async listing has
+	 * not landed yet.
+	 */
+	worktreeCount?: number | null;
 	usage: {
 		tier?: string;
 		fiveHour?: { percent: number; resetMinutes?: number };
