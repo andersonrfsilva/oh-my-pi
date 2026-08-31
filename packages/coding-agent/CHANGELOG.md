@@ -12,6 +12,7 @@
 - Added an opt-in `todo` status-line segment showing closed/total todo counts (configure via `statusLine.leftSegments`/`statusLine.rightSegments`).
 - The `git` status-line segment now shows upstream divergence (`↑N` unpushed, `↓N` behind); disable with `statusLine.segmentOptions.git.showUpstream: false`.
 - Added an opt-in `worktrees` status-line segment showing how many worktrees the active repository has (hidden for single-checkout repos).
+- Added an opt-in `approval` status-line segment that shows when tool approval is relaxed (`write` or `yolo`); it stays hidden in `always-ask`.
 
 ### Changed
 

@@ -240,6 +240,7 @@ export type StatusLineSegmentId =
 	| "pi"
 	| "model"
 	| "mode"
+	| "approval"
 	| "path"
 	| "worktrees"
 	| "git"

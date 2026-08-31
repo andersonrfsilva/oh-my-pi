@@ -696,6 +696,13 @@ export class SelectorController {
 				this.ctx.session.agent.repetitionPenalty = repetitionPenalty >= 0 ? repetitionPenalty : undefined;
 				break;
 			}
+			case "tools.approvalMode": {
+				// The segment reads the live setting on render; the bar just needs to
+				// be told to repaint. Mirrors refreshStatusLine in builtin-modes.ts.
+				this.ctx.statusLine.invalidate();
+				this.ctx.ui.requestRender();
+				break;
+			}
 			case "git.enabled":
 			case "statusLinePreset":
 			case "statusLine.preset":

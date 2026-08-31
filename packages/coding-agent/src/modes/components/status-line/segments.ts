@@ -382,6 +382,19 @@ const pathSegment: StatusLineSegment = {
 	},
 };
 
+const approvalSegment: StatusLineSegment = {
+	id: "approval",
+	render(ctx) {
+		const mode = ctx.approvalMode;
+		// `always-ask` is the strict posture: nothing to warn about.
+		if (mode == null || mode === "always-ask") return { content: "", visible: false };
+		if (mode === "write") {
+			return { content: theme.fg("muted", withIcon(theme.icon.warning, "write")), visible: true };
+		}
+		return { content: theme.fg("error", withIcon(theme.icon.warning, "yolo")), visible: true };
+	},
+};
+
 const worktreesSegment: StatusLineSegment = {
 	id: "worktrees",
 	render(ctx) {
@@ -826,6 +839,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	pi: piSegment,
 	model: modelSegment,
 	mode: modeSegment,
+	approval: approvalSegment,
 	path: pathSegment,
 	worktrees: worktreesSegment,
 	git: gitSegment,

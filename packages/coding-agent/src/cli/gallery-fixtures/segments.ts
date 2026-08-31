@@ -41,6 +41,7 @@ function baseContext(sessionOptions?: GallerySessionOptions): SegmentContext {
 		},
 		compactThinkingLevel: false,
 		planMode: { enabled: true, paused: false },
+		approvalMode: "yolo",
 		prewalk: null,
 		loopMode: null,
 		goalMode: null,
@@ -146,6 +147,12 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 					context: { planMode: null, goalMode: { enabled: true, paused: false } },
 					session: { goalStatus: "dropped" },
 				},
+			];
+		case "approval":
+			return [
+				{ label: "yolo", context: { approvalMode: "yolo" } },
+				{ label: "write", context: { approvalMode: "write" } },
+				{ label: "always ask (hidden)", context: { approvalMode: "always-ask" } },
 			];
 		case "path":
 			return [

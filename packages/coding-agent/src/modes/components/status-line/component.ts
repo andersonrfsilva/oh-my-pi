@@ -1991,6 +1991,14 @@ export class StatusLineComponent implements Component {
 		this.#syncSpeculationBlink(compactionSpeculation);
 		const sessionAccentEnabled = this.#resolveSettings().sessionAccent !== false;
 		const turnElapsedMs = this.getTurnElapsedMs();
+		const approvalSource = typeof this.session.settings?.get === "function" ? this.session.settings : settings;
+		let approvalMode: "always-ask" | "write" | "yolo" | null = null;
+		try {
+			const raw = approvalSource.get("tools.approvalMode");
+			approvalMode = raw === "always-ask" || raw === "write" || raw === "yolo" ? raw : null;
+		} catch {
+			approvalMode = null;
+		}
 		return {
 			session: this.session,
 			focusedAgentId: this.#focusedAgentId,
@@ -2001,6 +2009,7 @@ export class StatusLineComponent implements Component {
 			options: segmentOptions ?? {},
 			compactThinkingLevel: this.#resolveSettings().compactThinkingLevel ?? false,
 			planMode: this.#planModeStatus,
+			approvalMode,
 			loopMode: this.#loopModeStatus,
 			prewalk:
 				typeof this.session.getPrewalkState === "function" && this.session.getPrewalkState()

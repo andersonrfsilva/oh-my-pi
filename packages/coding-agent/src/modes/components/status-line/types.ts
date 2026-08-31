@@ -84,6 +84,14 @@ export interface SegmentContext {
 		enabled: boolean;
 		paused: boolean;
 	} | null;
+	/**
+	 * Effective global tool-approval mode for this session, or null when it
+	 * cannot be resolved (no settings on a collab-guest replica or a test
+	 * double). Per-tool `tools.approval` policies are deliberately not folded
+	 * in: they can still prompt or deny inside `yolo`, and the segment reports
+	 * the global posture only.
+	 */
+	approvalMode?: "always-ask" | "write" | "yolo" | null;
 	prewalk: {
 		enabled: boolean;
 	} | null;
