@@ -33,7 +33,7 @@ export const STATUS_LINE_PRESETS: Record<StatusLinePreset, PresetDef> = {
 	},
 
 	full: {
-		leftSegments: ["pi", "hostname", "model", "mode", "path", "git", "pr", "subagents"],
+		leftSegments: ["pi", "hostname", "model", "mode", "path", "worktrees", "git", "pr", "subagents", "todo"],
 		rightSegments: [
 			"session_name",
 			"cache_hit",
@@ -42,6 +42,7 @@ export const STATUS_LINE_PRESETS: Record<StatusLinePreset, PresetDef> = {
 			"token_rate",
 			"cache_read",
 			"cost",
+			"usage",
 			"context_pct",
 			"time_spent",
 			"time",
@@ -57,7 +58,19 @@ export const STATUS_LINE_PRESETS: Record<StatusLinePreset, PresetDef> = {
 
 	nerd: {
 		// Full preset with all Nerd Font icons
-		leftSegments: ["pi", "hostname", "model", "mode", "path", "git", "pr", "session", "subagents"],
+		leftSegments: [
+			"pi",
+			"hostname",
+			"model",
+			"mode",
+			"path",
+			"worktrees",
+			"git",
+			"pr",
+			"session",
+			"subagents",
+			"todo",
+		],
 		rightSegments: [
 			"session_name",
 			"token_in",
@@ -66,6 +79,7 @@ export const STATUS_LINE_PRESETS: Record<StatusLinePreset, PresetDef> = {
 			"cache_write",
 			"token_rate",
 			"cost",
+			"usage",
 			"context_pct",
 			"context_total",
 			"time_spent",

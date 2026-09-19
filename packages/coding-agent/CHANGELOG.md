@@ -13,6 +13,7 @@
 - The `git` status-line segment now shows upstream divergence (`↑N` unpushed, `↓N` behind); disable with `statusLine.segmentOptions.git.showUpstream: false`.
 - Added an opt-in `worktrees` status-line segment showing how many worktrees the active repository has (hidden for single-checkout repos).
 - Added an opt-in `approval` status-line segment that shows when tool approval is relaxed (`write` or `yolo`); it stays hidden in `always-ask`.
+- The `full` and `nerd` status-line presets now include the `usage` (provider subscription quota: 5h and weekly used percent with reset countdown), `todo` and `worktrees` segments, and `docs/settings.md` documents every status-line segment id.
 
 ### Changed
 

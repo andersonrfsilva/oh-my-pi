@@ -685,7 +685,60 @@ tui:
 | `tui.hyperlinks`            | enum    | `auto`           | `off`, `auto`, `always`.                                                  |
 | `tui.resizeScrollback`      | enum    | `rebuild`        | How a settled width resize refreshes transcript rows kept in terminal scrollback: `append` replays the transcript at the new width below retained history, `rebuild` erases pane scrollback then replays one current-width copy, `preserve` repaints only the viewport. |
 
-For a custom status line, set `statusLine.preset: custom` and configure `statusLine.leftSegments`, `statusLine.rightSegments`, and `statusLine.segmentOptions`.
+#### Status-line segments
+
+`statusLine.leftSegments` and `statusLine.rightSegments` are read **only when
+`statusLine.preset` is `custom`**. On any other preset the preset's own segment
+lists win and your arrays are ignored silently.
+
+```yaml
+statusLine:
+  preset: custom
+  leftSegments: [pi, model, mode, path, git, todo, context_pct, cost]
+  rightSegments: [usage, session_name]
+  segmentOptions:
+    path: { abbreviate: true, maxLength: 50 }
+    git: { showBranch: true, showUpstream: true }
+```
+
+The `full` and `nerd` presets already include `usage`, `todo` and `worktrees`.
+`approval` is opt-in only, because `tools.approvalMode` defaults to `yolo` and
+the segment would otherwise be permanently visible.
+
+| Segment | Shows |
+| ------- | ----- |
+| `pi` | Brand mark; a spinner plus turn timer while a turn is running, or the focused subagent's id. |
+| `model` | Active model name, thinking level, fast-mode marker, and advisor status badge. |
+| `mode` | Active mode — Plan, Prewalk, Goal, Vibe, or Loop with its remaining iterations/time. Hidden when none is active. |
+| `approval` | `tools.approvalMode` when it is permissive (`write`, `yolo`). Hidden on `always-ask`. |
+| `path` | Project directory, shortened and home-collapsed; collapses linked worktrees to the project name. |
+| `worktrees` | Number of linked git worktrees. Hidden in a plain checkout. |
+| `git` | Branch, plus `*unstaged`, `+staged`, `?untracked`, and `↑ahead` / `↓behind` counts. |
+| `pr` | Pull-request number for the current branch, hyperlinked. |
+| `subagents` | Number of running subagents. Hidden at zero. |
+| `todo` | `closed/total` todo items; warns when any item is blocked. |
+| `token_in` | Cumulative input tokens. |
+| `token_out` | Cumulative output tokens. |
+| `token_total` | Input + output + cache writes + orchestration tokens (cache reads excluded). |
+| `token_rate` | Current output throughput in tokens per second. |
+| `cost` | Session spend, premium-request count, and advisor spend; a subscription marker instead of a price on OAuth plans. |
+| `context_pct` | Share of the context window in use, with the auto-compaction indicator. |
+| `context_total` | The model's total context window. |
+| `time_spent` | Accumulated agent-active time; idle time between turns is not counted. |
+| `time` | Wall-clock time. |
+| `session` | First eight characters of the session id. |
+| `hostname` | Short hostname. |
+| `cache_read` | Tokens served from the prompt cache. |
+| `cache_write` | Tokens written to the prompt cache. |
+| `cache_hit` | Prompt-cache hit rate. |
+| `session_name` | Session name or title. |
+| `usage` | Active provider's subscription quota: used percent and reset countdown per window (`5h`, `1d`, `7d`, `mo`), colored by pressure. Hidden unless the active credential reports usage. |
+| `collab` | Collab session role and participant count. |
+
+`statusLine.segmentOptions` accepts per-segment keys for `model`
+(`showThinkingLevel`), `path` (`abbreviate`, `maxLength`, `stripWorkPrefix`),
+`git` (`showBranch`, `showStaged`, `showUnstaged`, `showUntracked`,
+`showUpstream`) and `time` (`format`, `showSeconds`).
 
 ### Interaction
 
