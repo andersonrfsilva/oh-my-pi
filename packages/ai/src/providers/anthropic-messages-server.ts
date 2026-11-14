@@ -676,6 +676,7 @@ type BlockKind = "text" | "thinking" | "tool_use";
 interface OpenBlock {
 	index: number;
 	kind: BlockKind;
+	inputJsonDeltaEmitted?: boolean;
 }
 
 // Keepalive cadence for the SSE encoder. Anthropic's API pings periodically;
@@ -941,7 +942,7 @@ export function encodeStream(
 							);
 							break;
 						}
-						case "toolcall_delta":
+						case "toolcall_delta": {
 							if (suppressed.has(ev.contentIndex)) break;
 							controller.enqueue(
 								sseFrame("content_block_delta", {
@@ -950,10 +951,27 @@ export function encodeStream(
 									delta: { type: "input_json_delta", partial_json: ev.delta },
 								}),
 							);
+							const block = open.get(ev.contentIndex);
+							if (block?.kind === "tool_use") block.inputJsonDeltaEmitted = true;
 							break;
-						case "toolcall_end":
+						}
+						case "toolcall_end": {
+							const block = open.get(ev.contentIndex);
+							if (block?.kind === "tool_use" && !block.inputJsonDeltaEmitted) {
+								controller.enqueue(
+									sseFrame("content_block_delta", {
+										type: "content_block_delta",
+										index: wireIndex(ev.contentIndex),
+										delta: {
+											type: "input_json_delta",
+											partial_json: JSON.stringify(ev.toolCall.arguments ?? {}),
+										},
+									}),
+								);
+							}
 							closeBlock(ev.contentIndex);
 							break;
+						}
 						case "done": {
 							for (const idx of Array.from(open.keys())) closeBlock(idx);
 							emitServerToolBlocksBefore(ev.message, ev.message.content.length);
