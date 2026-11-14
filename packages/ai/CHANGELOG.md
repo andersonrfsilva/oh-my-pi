@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed missing tool-use arguments in Anthropic auth-gateway streams when providers finalize tool calls without argument deltas.
+
 ## [18.12.5] - 2026-10-21
 
 ### Added

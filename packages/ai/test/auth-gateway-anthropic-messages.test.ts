@@ -775,6 +775,56 @@ describe("anthropic-messages encodeResponse", () => {
 });
 
 describe("anthropic-messages encodeStream", () => {
+	it("emits finalized arguments for two tool calls that stream no argument deltas", async () => {
+		const toolCalls: ToolCall[] = [
+			{ type: "toolCall", id: "call_1", name: "get_weather", arguments: { city: "Paris" } },
+			{ type: "toolCall", id: "call_2", name: "search", arguments: { query: "snow", limit: 2 } },
+		];
+		const finalMessage: AssistantMessage = {
+			role: "assistant",
+			content: toolCalls,
+			api: "openai-codex-responses",
+			provider: "openai-codex",
+			model: "gpt-5.4",
+			usage: emptyUsage(),
+			stopReason: "toolUse",
+			timestamp: 0,
+		};
+		const partial: AssistantMessage = {
+			...finalMessage,
+			content: toolCalls.map(toolCall => ({ ...toolCall, arguments: {} })),
+		};
+		const events: AssistantMessageEvent[] = [{ type: "start", partial }];
+		for (const [contentIndex, toolCall] of toolCalls.entries()) {
+			events.push(
+				{ type: "toolcall_start", contentIndex, partial },
+				{ type: "toolcall_end", contentIndex, toolCall, partial: finalMessage },
+			);
+		}
+		events.push({ type: "done", reason: "toolUse", message: finalMessage });
+
+		const sse = await collectSse(encodeStream(makeStream(events), "gpt-5.4"));
+		expect(sse.map(event => event.event)).toEqual([
+			"message_start",
+			"content_block_start",
+			"content_block_delta",
+			"content_block_stop",
+			"content_block_start",
+			"content_block_delta",
+			"content_block_stop",
+			"message_delta",
+			"message_stop",
+		]);
+		for (const [index, toolCall] of toolCalls.entries()) {
+			const deltas = sse
+				.filter(event => event.event === "content_block_delta" && event.data.index === index)
+				.map(event => event.data.delta as { type: string; partial_json: string });
+			expect(deltas).toHaveLength(1);
+			expect(deltas[0]!.type).toBe("input_json_delta");
+			expect(JSON.parse(deltas.map(delta => delta.partial_json).join(""))).toEqual(toolCall.arguments);
+		}
+	});
+
 	it("emits thinking_delta + signature_delta + text_delta + tool_use input_json_delta + message_stop", async () => {
 		const finalMessage: AssistantMessage = {
 			role: "assistant",
@@ -904,6 +954,14 @@ describe("anthropic-messages encodeStream", () => {
 			index: 2,
 			delta: { type: "input_json_delta", partial_json: '{"x":' },
 		});
+		expect(
+			sse
+				.filter(event => event.event === "content_block_delta" && event.data.index === 2)
+				.map(event => event.data.delta),
+		).toEqual([
+			{ type: "input_json_delta", partial_json: '{"x":' },
+			{ type: "input_json_delta", partial_json: "1}" },
+		]);
 
 		// message_delta with mapped stop_reason
 		expect(sse[13]!.data).toEqual({
@@ -1110,6 +1168,11 @@ describe("anthropic-messages encodeStream", () => {
 		]);
 		expect(sse.filter(event => event.event === "content_block_delta").map(event => event.data)).toEqual([
 			{ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Plan updated." } },
+			{
+				type: "content_block_delta",
+				index: 1,
+				delta: { type: "input_json_delta", partial_json: '{"city":"Paris"}' },
+			},
 		]);
 		expect(sse.filter(event => event.event === "content_block_stop").map(event => event.data.index)).toEqual([0, 1]);
 		expect(sse.find(event => event.event === "message_delta")?.data.delta).toEqual({
